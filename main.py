@@ -4,6 +4,7 @@ class Cipher(Scene):
     def construct(self):
         plaintext = "MESSAGE"
         key = "KEY"
+        ciphertext = ""
         key_len = len(key)
         plaintext_len = len(plaintext)
         plaintext_indices = [ord(char) - 65 for char in plaintext]
@@ -66,7 +67,7 @@ class Cipher(Scene):
 
         outer_dots.add(Triangle(color=BLACK).set_fill(RED, opacity=1).scale(0.16).rotate(60 * DEGREES).move_to(outer_dot_radius.point_at_angle(90 * DEGREES)))
 
-        for i in range(len(key)):
+        for i in range(key_len):
             new_dot = Dot(color=WHITE).move_to(inner_dot_radius.point_at_angle(
                 (90 - (key_indices[i] * (360 / 26))) * DEGREES))
             inner_dots.add(new_dot)
@@ -76,26 +77,25 @@ class Cipher(Scene):
         self.play(FadeIn(outer_ring), FadeIn(inner_ring))
         self.play(cipher.animate.scale(0.8))
         self.play(cipher.animate.shift(LEFT * 3))
-
-        self.play(*[inner_dots[i].animate.set_color(BLACK) for i in range(len(key))], run_time=2) 
+        self.play(*[inner_dots[i].animate.set_color(BLUE) for i in range(key_len)], run_time=2) 
 
         message_box = VGroup()
         key_box = VGroup()
         ciphertext_box = VGroup()
 
-        message_box.add(Square(side_length=0.75).set_stroke(BLACK, width=2))
-        key_box.add(Square(side_length=0.75).set_stroke(BLACK, width=2))
-        ciphertext_box.add(Square(side_length=0.75).set_stroke(BLACK, width=2)) 
+        message_box.add(Square(side_length=0.75).set_stroke(BLACK, width=3))
+        key_box.add(Square(side_length=0.75).set_stroke(BLACK, width=3))
+        ciphertext_box.add(Square(side_length=0.75).set_stroke(BLACK, width=3)) 
 
         for i in range(len(plaintext) - 1):
-            new_message_square = Square(side_length=0.75).set_stroke(BLACK, width=2).next_to(message_box, RIGHT, buff=0)
+            new_message_square = Square(side_length=0.75).set_stroke(BLACK, width=3).next_to(message_box, RIGHT, buff=0)
             message_box.add(new_message_square)
 
             if (i < key_len - 1):
-                new_key_square = Square(side_length=0.75).set_stroke(BLACK, width=2).next_to(key_box, RIGHT, buff=0)
+                new_key_square = Square(side_length=0.75).set_stroke(BLACK, width=3).next_to(key_box, RIGHT, buff=0)
                 key_box.add(new_key_square)
 
-            new_ciphertext_square = Square(side_length=0.75).set_stroke(BLACK, width=2).next_to(ciphertext_box, RIGHT, buff=0)
+            new_ciphertext_square = Square(side_length=0.75).set_stroke(BLACK, width=3).next_to(ciphertext_box, RIGHT, buff=0)
             ciphertext_box.add(new_ciphertext_square)
 
         message_box.next_to(cipher, RIGHT * 3).shift(UP)
@@ -104,6 +104,7 @@ class Cipher(Scene):
 
         message_group = VGroup()
         key_group = VGroup()
+        ciphertext_group = VGroup()
 
         for i in range(plaintext_len):
             message_char = Text(plaintext[i], font_size=24, color=BLACK).move_to(message_box[i].get_center())
@@ -139,16 +140,18 @@ class Cipher(Scene):
                       inner_letters[cipher_index].animate.set_color(RED).scale(1.8),
                       message_box[i].animate.set_fill(RED, opacity=0.5),
                       key_box[i % key_len].animate.set_fill(BLUE, opacity=0.5),
-                      ciphertext_box[i].animate.set_fill(RED, opacity=0.5), run_time=0.5)
+                      ciphertext_box[i].animate.set_fill(RED, opacity=0.5), run_time=0.25)
 
             cipher_char = chr(cipher_index + 65)
-            self.play(FadeIn(Text(cipher_char, font_size=24, color=RED).move_to(ciphertext_box[i].get_center())))
+            ciphertext += cipher_char
+            ciphertext_group.add(Text(cipher_char, font_size=24, color=RED).move_to(ciphertext_box[i].get_center()))    
+            self.play(FadeIn(ciphertext_group[i]))
 
             self.play(outer_letters[curr_plaintext_index].animate.scale(1/1.8), 
                       inner_letters[cipher_index].animate.set_color(BLACK).scale(1/1.8), 
-                      message_box[i].animate.set_fill(WHITE, opacity=0.5),
-                      key_box[i % key_len].animate.set_fill(WHITE, opacity=0.5),
-                      ciphertext_box[i].animate.set_fill(WHITE, opacity=0.5), run_time=0.5)
+                      message_box[i].animate.set_fill(WHITE, opacity=0),
+                      key_box[i % key_len].animate.set_fill(WHITE, opacity=0),
+                      ciphertext_box[i].animate.set_fill(WHITE, opacity=0), run_time=0.25)
 
             if (i < plaintext_len - 1):
                 self.play(Rotate(inner_ring, shift * (360 / 26) * DEGREES, run_time=2))
@@ -156,6 +159,58 @@ class Cipher(Scene):
         offset = key_indices[(plaintext_len - 1) % key_len]
         self.play(Rotate(inner_ring, -offset * (360 / 26) * DEGREES, run_time=2))
         self.wait(1)
+
+
+        #decrypting the message
+        decrypted_group = VGroup()
+
+        ciphertext_indices = [ord(char) - 65 for char in ciphertext]
+        self.play(FadeOut(message_group),
+                  ciphertext_group.animate.move_to(message_group.get_center()))
+        self.play(*[ciphertext_group[i].animate.set_color(BLACK) for i in range(len(ciphertext))])
+        
+        # Only rotate the inner ring for the first character of the plaintext
+        self.play(Rotate(inner_ring, key_indices[0] * (360 / 26) * DEGREES, run_time=2))
+
+        for i in range(len(ciphertext)):
+            curr_ciphertext_index = ciphertext_indices[i]
+            curr_key_index = key_indices[i % key_len]
+            next_key_index = key_indices[(i + 1) % key_len]
+
+            dist = next_key_index - curr_key_index
+            shift = dist
+
+            if abs(dist) > 13:
+                if dist > 0:
+                    shift -= 26
+                else:
+                    shift += 26
+
+            plaintext_index = (curr_ciphertext_index - curr_key_index) % 26
+
+            self.play(outer_letters[plaintext_index].animate.set_color(BLUE).scale(1.8), 
+                      inner_letters[(plaintext_index + curr_key_index) % 26].animate.scale(1.8),
+                      message_box[i].animate.set_fill(BLUE, opacity=0.5),
+                      key_box[i % key_len].animate.set_fill(RED, opacity=0.5),
+                      ciphertext_box[i].animate.set_fill(BLUE, opacity=0.5), run_time=0.25)
+
+            plaintext_char = chr(plaintext_index + 65)
+            decrypted_group.add(Text(plaintext_char, font_size=24, color=BLUE).move_to(ciphertext_box[i].get_center()))    
+            self.play(FadeIn(decrypted_group[i]))
+
+            self.play(outer_letters[plaintext_index].animate.set_color(BLACK).scale(1/1.8), 
+                      inner_letters[(plaintext_index + curr_key_index) % 26].animate.scale(1/1.8), 
+                      message_box[i].animate.set_fill(WHITE, opacity=0),
+                      key_box[i % key_len].animate.set_fill(WHITE, opacity=0),
+                      ciphertext_box[i].animate.set_fill(WHITE, opacity=0), run_time=0.25)
+
+            if (i < plaintext_len - 1):
+                self.play(Rotate(inner_ring, shift * (360 / 26) * DEGREES, run_time=2))
+
+        offset = key_indices[(plaintext_len - 1) % key_len]
+        self.play(Rotate(inner_ring, -offset * (360 / 26) * DEGREES, run_time=2))
+        self.wait(1)
+
 
 
 
